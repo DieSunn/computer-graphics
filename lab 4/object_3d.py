@@ -13,7 +13,7 @@ class Object3D:
 
     def draw(self):
         self.screen_projection()
-        # self.movement()
+    #     self.movement()
 
     # def movement(self):
     #     self.rotate_y(pg.time.get_ticks() % 0.005)

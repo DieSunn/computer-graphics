@@ -47,3 +47,4 @@ class SoftwareRender:
 if __name__ == "__main__":
     app = SoftwareRender()
     app.run()
+    
