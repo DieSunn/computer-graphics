@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flood Fill Algorithm</title>
+<style>
+    canvas {
+        border: 1px solid black;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas" width="400" height="400"></canvas>
+<button id="drawMode">Режим рисования</button>
+<button id="fillMode">Режим заливки</button>
+<button id="clearCanvas">Очистить холст</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const canvasWidth = canvas.width;
+const canvasHeight = canvas.height;
+let isDrawing = false;
+let drawnPixels = []; // массив для отслеживания нарисованных пикселей
+let isFillMode = false;
+
+// Функция для добавления нарисованного пикселя в массив
+function addDrawnPixel(x, y) {
+    const pixelData = ctx.getImageData(x, y, 1, 1).data;
+    drawnPixels.push({ x, y, color: pixelData });
+}
+
+// Функция для проверки, является ли цвет однородным в точке (x, y)
+function isSameColor(pixelColor, targetColor) {
+    return (
+        pixelColor[0] === targetColor[0] &&
+        pixelColor[1] === targetColor[1] &&
+        pixelColor[2] === targetColor[2] &&
+        pixelColor[3] === targetColor[3]
+    );
+}
+
+// Алгоритм заливки затравкой
+function floodFill(startX, startY, targetColor, fillColor) {
+    // Создаем стек с начальной точкой
+    const stack = [[startX, startY]];
+
+    // Пока стек не пуст
+    while (stack.length > 0) {
+        // Извлекаем координаты из стека
+        const [x, y] = stack.pop();
+
+        // Проверяем, находится ли точка в пределах холста
+        if (x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight) {
+            // Получаем цвет текущего пикселя
+            const pixelColor = ctx.getImageData(x, y, 1, 1).data;
+
+            // Если цвет текущего пикселя совпадает с целевым цветом
+            if (isSameColor(pixelColor, targetColor)) {
+                // Заливаем текущий пиксель новым цветом
+                ctx.fillStyle = `rgba(${fillColor[0]}, ${fillColor[1]}, ${fillColor[2]}, ${fillColor[3]})`;
+                ctx.fillRect(x, y, 1, 1);
+
+                // Добавляем соседние пиксели в стек
+                stack.push([x + 1, y]);
+                stack.push([x - 1, y]);
+                stack.push([x, y + 1]);
+                stack.push([x, y - 1]);
+            }
+        }
+    }
+}
+
+
+// Обработчики событий для рисования на холсте
+canvas.addEventListener('mousedown', (event) => {
+    if (!isFillMode) {
+        isDrawing = true;
+        addDrawnPixel(event.offsetX, event.offsetY);
+    }
+});
+
+canvas.addEventListener('mousemove', (event) => {
+    if (isDrawing && !isFillMode) {
+        const x = event.offsetX;
+        const y = event.offsetY;
+        ctx.beginPath();
+        ctx.moveTo(drawnPixels[drawnPixels.length - 1].x, drawnPixels[drawnPixels.length - 1].y);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        addDrawnPixel(x, y);
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDrawing = false;
+});
+
+// Обработчик события клика для запуска заливки затравкой
+canvas.addEventListener('click', (event) => {
+    if (isFillMode) {
+        if (drawnPixels.length === 0) return; // если не нарисовано ни одного пикселя, выходим из функции
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.round(event.clientX - rect.left);
+        const y = Math.round(event.clientY - rect.top);
+        const targetColor = drawnPixels[0].color; // используем цвет первого нарисованного пикселя в качестве затравки
+        const fillColor = [255, 255, 0, 255]; 
+        floodFill(x, y, targetColor, fillColor);
+    }
+});
+
+// Обработчик для кнопки выбора режима рисования
+document.getElementById('drawMode').addEventListener('click', () => {
+    isFillMode = false;
+});
+
+// Обработчик для кнопки выбора режима заливки
+document.getElementById('fillMode').addEventListener('click', () => {
+    isFillMode = true;
+});
+
+// Обработчик для кнопки очистки холста
+document.getElementById('clearCanvas').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawnPixels = [];
+    isFillMode = false;
+});
+</script>
+</body>
+</html>
