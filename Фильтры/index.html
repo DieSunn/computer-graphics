@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ОБработка изображений</title>
+</head>
+<body>
+    <input type="file" accept="image/*">
+    <canvas id="outputCanvas" style="display: none;"></canvas>
+    <div id="filterButtons">
+        <button id="blurButton">Блюр</button>
+        <button id="edgeDetectionButton">Обнаружение краев</button>
+        <button id="sharpenButton">Резкость</button>
+    </div>
+    <div id="customFilters">
+        <h3>Кастомные фильтры</h3>
+        <label for="customFilterInput">Введите коэффициенты через запятую:</label>
+        <textarea id="customFilterInput" rows="5" cols="30" value="1/16, 1/8, 1/16, 1/8,
+        1/8, 1/4, 1/8, 1/4,
+        1/16, 1/8, 1/16, 1/8,
+        1/8, 1/4, 1/8, 1/4"></textarea> 
+        <button id="applyCustomFilterButton">Применить</button>
+    </div>
+    <script src="script.js"></script>
+    <script>
+        // Получаем ссылку на элемент <input type="file">
+        const fileInput = document.querySelector('input[type="file"]');
+        const imageProcessor = new ImageProcessor();
+
+        // Обработчик события изменения файла
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+
+            img.onload = async () => {
+                const canvas = document.getElementById('outputCanvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                // Отображаем canvas, чтобы изображение было видно
+                canvas.style.display = 'block';
+
+                const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+                // Обработчики событий для кнопок
+                document.getElementById('blurButton').addEventListener('click', () => {
+                    const filteredImageData = imageProcessor.applyFilter('blur', imageData);
+                    ctx.putImageData(filteredImageData, 0, 0);
+                });
+
+                document.getElementById('edgeDetectionButton').addEventListener('click', () => {
+                    const filteredImageData = imageProcessor.applyFilter('edgeDetection', imageData);
+                    ctx.putImageData(filteredImageData, 0, 0);
+                });
+
+                document.getElementById('sharpenButton').addEventListener('click', () => {
+                    const filteredImageData = imageProcessor.applyFilter('sharpen', imageData);
+                    ctx.putImageData(filteredImageData, 0, 0);
+                });
+
+                // Обработчик события для применения пользовательского фильтра
+                document.getElementById('applyCustomFilterButton').addEventListener('click', () => {
+                    const customFilterInput = document.getElementById('customFilterInput').value;
+                    const customFilterCoefficients = customFilterInput.split(',').map(parseFloat);
+                    const filteredImageData = imageProcessor.applyCustomFilter(customFilterCoefficients, imageData);
+                    ctx.putImageData(filteredImageData, 0, 0);
+                });
+            };
+        });
+    </script>
+</body>
+</html>

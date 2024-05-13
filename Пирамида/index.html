@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Пирамида</title>
+    <style>
+    canvas {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas1" width="1000" height="700"></canvas>
+  
+  <form id="cubeForm">
+    <label>
+      Количество ребер основания:
+      <input type="number" id="cubeSizeInput" min="1" value="3">
+    </label>
+    <button type="button" onclick="createPyramid()">Создать</button>
+  </form>
+  
+  <form id="checkboxForm">
+    <label>
+      <input type="checkbox" name="checkboxX"> Поворот по оси X
+    </label>
+    <br>
+    <label>
+      <input type="checkbox" name="checkboxY"> Поворот по оси Y
+    </label>
+    <br>
+    <label>
+      <input type="checkbox" name="checkboxZ"> Поворот по оси Z
+    </label>
+  </form>
+  
+  <script src="script.js"></script>
+</body>
+</html>
