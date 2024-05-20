@@ -1,66 +1,271 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Воксельная вода</title>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Voxel Water Simulation</title>
     <style>
-        body { margin: 0; padding: 0; }
-        canvas { width: 100%; height: 100%; }
+      body {
+        margin: 0;
+      }
+      canvas {
+        display: block;
+      }
     </style>
-</head>
-<body>
-    <canvas id="canvas"></canvas>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+  </head>
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
     <script>
-        var scene = new THREE.Scene();
-        var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        var renderer = new THREE.WebGLRenderer({canvas: document.getElementById('canvas')});
+      let scene, camera, renderer, controls, cup;
+      const voxelSize = 0.5; // Размер вокселя (кубика)
+      const waterVoxels = []; // Массив для хранения вокселей воды
+      const maxHeight = 1000; // Максимальная высота наливания воды
+      const gravity = -9.8; // Гравитация
+      const deltaTime = 0.016; // Приблизительно 60 кадров в секунду
+      const cupWidth = 10; // Ширина чаши
+      const cupHeight = 10; // Высота чаши
+      const cupDepth = 10; // Глубина чаши
+      let pouringWater = true; // Переменная для включения/отключения наливания воды
+      let waterLevel = 0; // Начальный уровень воды
+      let currentLayer = 0; // Текущий заполняемый слой
+      let voxelsInCurrentLayer = 0; // Количество вокселей в текущем слое
 
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+      // Вектор для хранения угловой скорости чаши
+      let angularVelocity = new THREE.Vector3(0, 0, 0);
 
-        // Создаем массив вокселей
-        var voxels = [];
-        for (var x = 0; x < 10; x++) {
-            voxels[x] = [];
-            for (var y = 0; y < 10; y++) {
-                voxels[x][y] = [];
-                for (var z = 0; z < 10; z++) {
-                    // Заполняем массив случайными значениями для имитации воды
-                    voxels[x][y][z] = Math.random() > 0.5 ? 1 : 0;
-                }
-            }
+      // Инициализация сцены Three.js
+      function initThree() {
+        scene = new THREE.Scene(); // Создаем сцену
+        scene.background = new THREE.Color(0xf0f0f0); // Устанавливаем светлый фон
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          1000
+        ); // Настраиваем камеру
+        renderer = new THREE.WebGLRenderer(); // Создаем рендерер
+        renderer.setSize(window.innerWidth, window.innerHeight); // Устанавливаем размер рендерера
+        document.body.appendChild(renderer.domElement); // Добавляем рендерер в DOM
+
+        // Добавляем освещение
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 10, 7.5);
+        scene.add(light);
+
+        // Создаем чашу
+        const cupGeometry = new THREE.BoxGeometry(
+          cupWidth,
+          cupHeight,
+          cupDepth
+        );
+        const cupMaterial = new THREE.MeshBasicMaterial({
+          color: 0x888888,
+          wireframe: true,
+        });
+        cup = new THREE.Mesh(cupGeometry, cupMaterial);
+        cup.position.y = cupHeight / 2;
+        scene.add(cup);
+
+        // Устанавливаем позицию камеры
+        camera.position.set(15, 20, 20);
+
+        // Настраиваем орбитальные контролы
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, cupHeight / 2, 0);
+        controls.update();
+
+        // Обрабатываем изменение размера окна
+        window.addEventListener("resize", () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Обрабатываем нажатие клавиши
+        window.addEventListener("keydown", (event) => {
+          switch (event.key) {
+            case "p":
+              pouringWater = !pouringWater; // Переключаем состояние наливания воды
+              break;
+            case "w":
+              rotateCup("x", -Math.PI / 12); // Поворот по оси X вверх
+              break;
+            case "s":
+              rotateCup("x", Math.PI / 12); // Поворот по оси X вниз
+              break;
+            case "a":
+              rotateCup("z", -Math.PI / 12); // Поворот по оси Z влево
+              break;
+            case "d":
+              rotateCup("z", Math.PI / 12); // Поворот по оси Z вправо
+              break;
+          }
+        });
+      }
+
+      // Добавление вокселя воды
+      function addWaterVoxel(x, y, z) {
+        const geometry = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
+        const material = new THREE.MeshLambertMaterial({
+          color: 0x0000ff,
+          opacity: 0.6,
+          transparent: true,
+        });
+        const voxel = new THREE.Mesh(geometry, material);
+        voxel.position.set(x, y, z);
+        scene.add(voxel);
+
+        // Добавляем воксель воды в массив с начальными скоростями
+        waterVoxels.push({ mesh: voxel, velocity: new THREE.Vector3(0, 0, 0) });
+      }
+
+      // Симуляция наливания воды
+      function pourWater() {
+        // Определяем количество вокселей, которое может поместиться в один слой
+        const voxelsPerLayer =
+          Math.floor(cupWidth / voxelSize) * Math.floor(cupDepth / voxelSize);
+
+        // Переходим на следующий слой, если текущий заполнен
+        if (voxelsInCurrentLayer >= voxelsPerLayer) {
+          currentLayer++;
+          voxelsInCurrentLayer = 0;
+          waterLevel = currentLayer * voxelSize;
         }
 
-        // Рендерим воксели
-        for (var x = 0; x < voxels.length; x++) {
-            for (var y = 0; y < voxels[x].length; y++) {
-                for (var z = 0; z < voxels[x][y].length; z++) {
-                    if (voxels[x][y][z] === 1) {
-                        // Создаем воксель
-                        var geometry = new THREE.BoxGeometry(1, 1, 1);
-                        var material = new THREE.MeshBasicMaterial({color: 0x0000ff});
-                        var voxel = new THREE.Mesh(geometry, material);
-                        
-                        // Позиционируем воксель
-                        voxel.position.x = x;
-                        voxel.position.y = y;
-                        voxel.position.z = z;
-                        
-                        // Добавляем воксель на сцену
-                        scene.add(voxel);
-                    }
-                }
-            }
+        // Генерируем случайные координаты для нового вокселя в пределах текущего слоя
+        const x = (Math.random() - 0.5) * (cupWidth - voxelSize);
+        const z = (Math.random() - 0.5) * (cupDepth - voxelSize);
+        addWaterVoxel(x, waterLevel, z);
+        voxelsInCurrentLayer++;
+
+        // Ограничиваем высоту наливания
+        if (waterLevel > maxHeight) {
+          waterLevel = maxHeight;
+        }
+      }
+
+      // Поворот чаши
+      function rotateCup(axis, angle) {
+        if (axis === "x") {
+          cup.rotation.x += angle; // Поворот по оси X
+        } else if (axis === "z") {
+          cup.rotation.z += angle; // Поворот по оси Z
         }
 
-        camera.position.z = 5;
+        // Обновляем угловую скорость чаши
+        angularVelocity[axis] = angle / deltaTime;
+      }
 
-        var animate = function () {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        };
+      // Проверка наличия воды под текущим вокселем
+      function isVoxelBelow(voxel) {
+        return waterVoxels.some(
+          (otherVoxel) =>
+            Math.abs(otherVoxel.mesh.position.x - voxel.mesh.position.x) <
+              voxelSize &&
+            Math.abs(otherVoxel.mesh.position.z - voxel.mesh.position.z) <
+              voxelSize &&
+            otherVoxel.mesh.position.y < voxel.mesh.position.y &&
+            voxel.mesh.position.y - otherVoxel.mesh.position.y <= voxelSize
+        );
+      }
 
-        animate();
+      // Проверка наличия воды вокруг текущего вокселя
+      function isVoxelNearby(voxel) {
+        return waterVoxels.some(
+          (otherVoxel) =>
+            otherVoxel !== voxel &&
+            Math.abs(otherVoxel.mesh.position.x - voxel.mesh.position.x) <
+              voxelSize &&
+            Math.abs(otherVoxel.mesh.position.y - voxel.mesh.position.y) <
+              voxelSize &&
+            Math.abs(otherVoxel.mesh.position.z - voxel.mesh.position.z) <
+              voxelSize
+        );
+      }
+
+      // Физическая симуляция
+      function simulatePhysics() {
+        const cupInverseMatrix = cup.matrixWorld.clone().invert();
+
+        waterVoxels.forEach((voxel) => {
+          // Применение гравитации и инерции
+          if (!isVoxelBelow(voxel)) {
+            voxel.velocity.y += gravity * deltaTime;
+          }
+
+          // Обновление позиции
+          voxel.mesh.position.addScaledVector(voxel.velocity, deltaTime);
+
+          // Преобразование позиции в локальную систему координат чаши
+          const localPosition = new THREE.Vector3()
+            .copy(voxel.mesh.position)
+            .applyMatrix4(cupInverseMatrix);
+
+          // Проверка столкновений с границами чаши в локальной системе координат
+          if (localPosition.y - voxelSize / 2 < -cupHeight / 2) {
+            localPosition.y = -cupHeight / 2 + voxelSize / 2;
+            voxel.velocity.y = 0;
+          }
+          if (localPosition.y + voxelSize / 2 > cupHeight / 2) {
+            localPosition.y = cupHeight / 2 - voxelSize / 2;
+            voxel.velocity.y = 0;
+          }
+          if (localPosition.x - voxelSize / 2 < -cupWidth / 2) {
+            localPosition.x = -cupWidth / 2 + voxelSize / 2;
+            voxel.velocity.x = 0;
+          }
+          if (localPosition.x + voxelSize / 2 > cupWidth / 2) {
+            localPosition.x = cupWidth / 2 - voxelSize / 2;
+            voxel.velocity.x = 0;
+          }
+          if (localPosition.z - voxelSize / 2 < -cupDepth / 2) {
+            localPosition.z = -cupDepth / 2 + voxelSize / 2;
+            voxel.velocity.z = 0;
+          }
+          if (localPosition.z + voxelSize / 2 > cupDepth / 2) {
+            localPosition.z = cupDepth / 2 - voxelSize / 2;
+            voxel.velocity.z = 0;
+          }
+
+          // Преобразование позиции обратно в мировую систему координат
+          voxel.mesh.position.copy(localPosition.applyMatrix4(cup.matrixWorld));
+
+          // Обновляем позицию вокселя с учетом угловой скорости чаши (инерция)
+          if (!isVoxelBelow(voxel) && isVoxelNearby(voxel)) {
+            const inertiaForce = new THREE.Vector3().crossVectors(
+              angularVelocity,
+              localPosition
+            );
+            voxel.velocity.addScaledVector(inertiaForce, deltaTime);
+          }
+        });
+
+        // Плавное затухание угловой скорости чаши
+        angularVelocity.multiplyScalar(0.98);
+      }
+
+      // Цикл анимации
+      function animate() {
+        requestAnimationFrame(animate); // Запрос нового кадра
+        simulatePhysics(); // Запуск физической симуляции
+        controls.update(); // Обновление контролов
+        renderer.render(scene, camera); // Рендеринг сцены
+
+        // Добавление новых вокселей воды, пока их количество не достигнет 10000
+        if (pouringWater && waterVoxels.length < 10000) {
+          pourWater();
+        }
+      }
+
+      // Инициализация и запуск симуляции
+      function init() {
+        initThree(); // Инициализация сцены
+        animate(); // Запуск анимации
+        waterLevel = 0;
+      }
+
+      init(); // Запуск инициализации
     </script>
-</body>
+  </body>
 </html>

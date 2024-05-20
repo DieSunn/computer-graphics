@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triangle</title>
+    <style>
+        #canvas {
+            border: 1px solid black;
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <button id="triangulateBtn">Triangulate</button>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+            const triangulateBtn = document.getElementById("triangulateBtn");
+            let lines = [];
+            let resultLines = [];
+
+            let drawing = true;
+            let prevPoint = null;
+
+            canvas.addEventListener("mousedown", function(e) {
+                if (e.button === 0) {
+                    if (drawing) {
+                        if (prevPoint) {
+                            const line = { start: prevPoint, end: { x: e.offsetX, y: e.offsetY } };
+                            lines.push(line);
+                            drawLine(line);
+                        }
+                        prevPoint = { x: e.offsetX, y: e.offsetY };
+                    }
+                }
+            });
+
+            function drawLine(line) {
+                ctx.beginPath();
+                ctx.moveTo(line.start.x, line.start.y);
+                ctx.lineTo(line.end.x, line.end.y);
+                ctx.stroke();
+            }
+
+            triangulateBtn.addEventListener("click", function() {
+                drawing = false;
+                prevPoint = null;
+                endContour();
+                triangulate();
+            });
+
+            function endContour() {
+                if (lines.length > 0) {
+                    const start = lines[0].start;
+                    const end = lines[lines.length - 1].end;
+                    const line = { start: end, end: start };
+                    lines.push(line);
+                    drawLine(line);
+                }
+            }
+
+            function triangulate() {
+                resultLines = [];
+                for (let i = 0; i < lines.length; i++) {
+                    for (let j = 0; j < lines.length; j++) {
+                        const section = { start: lines[i].start, end: lines[j].end };
+                        if (sectionLength(section) === 0 || lineArrayContains(lines, section) || lineArrayContains(resultLines, section)) continue;
+                        let intersect = false;
+                        for (let k = 0; k < lines.length; k++) {
+                            if (isIntersect(section, lines[k])) {
+                                intersect = true;
+                                break;
+                            }
+                        }
+                        for (let k = 0; k < resultLines.length; k++) {
+                            if (isIntersect(section, resultLines[k])) {
+                                intersect = true;
+                                break;
+                            }
+                        }
+                        if (!intersect && inPolygon(getCenterDot(section))) {
+                            resultLines.push(section);
+                        }
+                    }
+                }
+                for (let i = 0; i < resultLines.length; i++) {
+                    drawLine(resultLines[i]);
+                }
+            }
+
+            function sectionLength(section) {
+                return Math.pow(section.end.x - section.start.x, 2) + Math.pow(section.end.y - section.start.y, 2);
+            }
+
+            function isIntersect(line1, line2) {
+                const v1 = vectorProduct(line2.end.x - line2.start.x, line2.end.y - line2.start.y, line1.start.x - line2.start.x, line1.start.y - line2.start.y);
+                const v2 = vectorProduct(line2.end.x - line2.start.x, line2.end.y - line2.start.y, line1.end.x - line2.start.x, line1.end.y - line2.start.y);
+                const v3 = vectorProduct(line1.end.x - line1.start.x, line1.end.y - line1.start.y, line2.start.x - line1.start.x, line2.start.y - line1.start.y);
+                const v4 = vectorProduct(line1.end.x - line1.start.x, line1.end.y - line1.start.y, line2.end.x - line1.start.x, line2.end.y - line1.start.y);
+                return v1 * v2 < 0 && v3 * v4 < 0;
+            }
+
+            function inPolygon(point) {
+                let npol = lines.length;
+                let j = npol - 1;
+                let c = false;
+                for (let i = 0; i < npol; i++) {
+                    if (((lines[i].start.y <= point.y && point.y < lines[j].start.y) || (lines[j].start.y <= point.y && point.y < lines[i].start.y)) &&
+                        (point.x > (lines[j].start.x - lines[i].start.x) * (point.y - lines[i].start.y) / (lines[j].start.y - lines[i].start.y) + lines[i].start.x)) {
+                        c = !c;
+                    }
+                    j = i;
+                }
+                return c;
+            }
+
+            function getCenterDot(line) {
+                const xOffset = (line.end.x - line.start.x) / 2;
+                const yOffset = (line.end.y - line.start.y) / 2;
+                return { x: line.start.x + xOffset, y: line.start.y + yOffset };
+            }
+
+            function vectorProduct(ax, ay, bx, by) {
+                return ax * by - bx * ay;
+            }
+
+            function lineArrayContains(array, line) {
+                for (let i = 0; i < array.length; i++) {
+                    if (array[i].start.x === line.start.x && array[i].start.y === line.start.y &&
+                        array[i].end.x === line.end.x && array[i].end.y === line.end.y) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

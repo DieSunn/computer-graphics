@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=0.67" />
+    <title>График</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 20px;
+      }
+
+      canvas {
+        border: 1px solid #ccc;
+        margin-top: 20px;
+      }
+
+      #chartCanvas {
+        background-color: #d0d0d0;
+      }
+
+      #bChartCanvas {
+        background-color: #d0d0d0;
+      }
+
+      #gChartCanvas {
+        background-color: #d0d0d0;
+      }
+
+      #originalCopyCanvas,
+      #photoCanvas,
+      .copy-chart-canvas {
+        border: 1px solid #000;
+      }
+
+      .copy-chart-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .copy-chart-canvas {
+        margin-top: 20px;
+      }
+     
+    </style>
+  </head>
+  <body>
+    <canvas id="chartCanvas" width="600" height="400"></canvas>
+    <canvas id="gChartCanvas" width="600" height="400"></canvas>
+    <canvas id="bChartCanvas" width="600" height="400"></canvas>
+    <input type="file" id="imageInput" accept="image/*"/>
+
+
+    <canvas id="photoCanvas"></canvas>
+    <div class="container">
+      <!-- Второй холст для копии фото -->
+      <canvas id="originalCopyCanvas"></canvas>
+      <!-- Копии графиков цветов -->
+      <div class="copy-chart-container">
+        <canvas
+          class="copy-chart-canvas"
+          id="copyChartCanvasRed"
+          width="600"
+          height="400"
+        ></canvas>
+        <canvas
+          class="copy-chart-canvas"
+          id="copyChartCanvasGreen"
+          width="600"
+          height="400"
+        ></canvas>
+        <canvas
+          class="copy-chart-canvas"
+          id="copyChartCanvasBlue"
+          width="600"
+          height="400"
+        ></canvas>
+      </div>
+      <!-- Добавляем холст для зеленого цвета -->
+    </div>
+    
+
+    <script>
+      var originalCopyCanvas = document.getElementById("originalCopyCanvas"); // Получаем второй холст для копии фото
+      var originalCopyCtx = originalCopyCanvas.getContext("2d"); // Получаем контекст второго холста для копии фото
+      var chartCanvas = document.getElementById("chartCanvas");
+      var chartCtx = chartCanvas.getContext("2d");
+      var photoCanvas = document.getElementById("photoCanvas");
+      var photoCtx = photoCanvas.getContext("2d");
+      var bChartCanvas = document.getElementById("bChartCanvas");
+      var bChartCtx = bChartCanvas.getContext("2d");
+      var gChartCanvas = document.getElementById("gChartCanvas"); // Получаем холст для зеленого цвета
+      var gChartCtx = gChartCanvas.getContext("2d"); // Получаем контекст холста для зеленого цвета
+      var data = [];
+      var redData = []; // Массив данных для красного цвета
+      var blueData = []; // Массив данных для синего цвета
+      var greenData = []; // Массив данных для зеленого цвета
+      var barWidth;
+      var redCurvePoints = [];
+      var blueCurvePoints = [];
+      var greenCurvePoints = []; // Добавляем массив точек для зеленого цвета
+      // copies
+      var cpchartCanvas = document.getElementById("copyChartCanvasRed");
+      var cpchartCtx = cpchartCanvas.getContext("2d");
+      var cpbChartCanvas = document.getElementById("copyChartCanvasBlue");
+      var cpbChartCtx = cpbChartCanvas.getContext("2d");
+      var cpgChartCanvas = document.getElementById("copyChartCanvasGreen"); // Получаем холст для зеленого цвета
+      var cpgChartCtx = cpgChartCanvas.getContext("2d"); // Получаем контекст холста для зеленого цвета
+
+      // Функция отрисовки графика
+      function drawChart(data, color, context) {
+        context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+        var maxValue = Math.max.apply(null, data);
+        for (var i = 0; i <= 10; i++) {
+          var y =
+            context.canvas.height -
+            50 -
+            (i / 10) * (context.canvas.height - 100);
+          context.beginPath();
+          context.moveTo(45, y);
+          context.lineTo(50, y);
+          context.stroke();
+          context.fillText(((maxValue * i) / 10).toFixed(0), 20, y);
+        }
+        barWidth = (context.canvas.width - 100) / data.length;
+        for (var i = 0; i < data.length; i++) {
+          var barHeight = (data[i] / maxValue) * (context.canvas.height - 100);
+          var x = 50 + i * (barWidth + 2);
+          var y = context.canvas.height - 50 - barHeight;
+          context.fillStyle = color;
+          context.fillRect(x, y, barWidth, barHeight);
+        }
+      }
+
+      // Функция обновления данных графика
+      function updateChartData(newData, color, context) {
+        if (color === "red") {
+          redData = newData;
+        } else if (color === "blue") {
+          blueData = newData;
+        } else if (color === "green") {
+          greenData = newData;
+        }
+        //console.log("Данные графика обновлены:", newData);
+        drawChart(newData, color, context);
+      }
+
+      // Переменные для отслеживания состояния рисования
+      var isDrawingRed = false;
+      var isDrawingBlue = false;
+      var isDrawingGreen = false; // Добавляем переменную для зеленого цвета
+
+      // Обработчики событий для рисования на графике
+      chartCanvas.addEventListener("mousedown", function (event) {
+        isDrawingRed = true;
+        redCurvePoints.push({
+          x: event.clientX - chartCanvas.offsetLeft,
+          y: event.clientY - chartCanvas.offsetTop,
+        });
+      });
+
+      chartCanvas.addEventListener("mouseup", function (event) {
+        if (isDrawingRed) {
+          isDrawingRed = false;
+          var newData = getUpdatedData(redCurvePoints, "red");
+          updateChartData(newData, "red", chartCtx);
+          redCurvePoints = [];
+          applyHistogramToPhoto(newData);
+        }
+      });
+
+      chartCanvas.addEventListener("mousemove", function (event) {
+        if (isDrawingRed) {
+          redCurvePoints.push({
+            x: event.clientX - chartCanvas.offsetLeft,
+            y: event.clientY - chartCanvas.offsetTop,
+          });
+          drawSegment(
+            redCurvePoints[redCurvePoints.length - 2],
+            redCurvePoints[redCurvePoints.length - 1],
+            "red",
+            chartCtx
+          );
+        }
+      });
+
+      bChartCanvas.addEventListener("mousedown", function (event) {
+        isDrawingBlue = true;
+        blueCurvePoints.push({
+          x: event.clientX - bChartCanvas.offsetLeft,
+          y: event.clientY - bChartCanvas.offsetTop,
+        });
+      });
+
+      bChartCanvas.addEventListener("mouseup", function (event) {
+        if (isDrawingBlue) {
+          isDrawingBlue = false;
+          var newData = getUpdatedData(blueCurvePoints, "blue");
+          updateChartData(newData, "blue", bChartCtx);
+          blueCurvePoints = [];
+          applyHistogramToPhoto(newData);
+        }
+      });
+
+      bChartCanvas.addEventListener("mousemove", function (event) {
+        if (isDrawingBlue) {
+          blueCurvePoints.push({
+            x: event.clientX - bChartCanvas.offsetLeft,
+            y: event.clientY - bChartCanvas.offsetTop,
+          });
+          drawSegment(
+            blueCurvePoints[blueCurvePoints.length - 2],
+            blueCurvePoints[blueCurvePoints.length - 1],
+            "blue",
+            bChartCtx
+          );
+        }
+      });
+
+      gChartCanvas.addEventListener("mousedown", function (event) {
+        // Обработчик события для зеленого цвета
+        isDrawingGreen = true;
+        greenCurvePoints.push({
+          x: event.clientX - gChartCanvas.offsetLeft,
+          y: event.clientY - gChartCanvas.offsetTop,
+        });
+      });
+
+      gChartCanvas.addEventListener("mouseup", function (event) {
+        if (isDrawingGreen) {
+          isDrawingGreen = false;
+          var newData = getUpdatedData(greenCurvePoints, "green");
+          updateChartData(newData, "green", gChartCtx);
+          greenCurvePoints = [];
+          applyHistogramToPhoto(newData);
+        }
+      });
+
+      gChartCanvas.addEventListener("mousemove", function (event) {
+        if (isDrawingGreen) {
+          greenCurvePoints.push({
+            x: event.clientX - gChartCanvas.offsetLeft,
+            y: event.clientY - gChartCanvas.offsetTop,
+          });
+          drawSegment(
+            greenCurvePoints[greenCurvePoints.length - 2],
+            greenCurvePoints[greenCurvePoints.length - 1],
+            "green",
+            gChartCtx
+          );
+        }
+      });
+
+      // Функция рисования отрезка
+      function drawSegment(startPoint, endPoint, color, context) {
+        if (startPoint && endPoint) {
+          context.strokeStyle = color;
+          context.beginPath();
+          context.moveTo(startPoint.x, startPoint.y);
+          context.lineTo(endPoint.x, endPoint.y);
+          context.stroke();
+        }
+      }
+
+      // Функция обновления данных гистограммы
+      function getUpdatedData(points, color) {
+        var newData =
+          color === "red"
+            ? redData.slice()
+            : color === "blue"
+            ? blueData.slice()
+            : color === "green"
+            ? greenData.slice()
+            : [];
+        var maxValue = Math.max.apply(null, newData);
+        for (var i = 0; i < points.length; i++) {
+          var columnIndex = Math.floor((points[i].x - 50) / (barWidth + 2));
+          var changeValue = Math.round(
+            (chartCanvas.height - 50 - points[i].y) /
+              ((chartCanvas.height - 100) / maxValue)
+          );
+          if (changeValue < 0) changeValue = 0;
+          if (changeValue > maxValue) changeValue = maxValue;
+          newData[columnIndex] = changeValue;
+        }
+        return newData;
+      }
+
+      // Обработчик события изменения файла изображения
+      document
+        .getElementById("imageInput")
+        .addEventListener("change", function (event) {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const image = new Image();
+              image.src = e.target.result;
+              image.onload = function () {
+                var canvas = document.getElementById("photoCanvas");
+                var originalCopyCanvas =
+                  document.getElementById("originalCopyCanvas");
+                // Устанавливаем размеры холстов равными размерам загруженной фотографии
+                canvas.width = image.width;
+                canvas.height = image.height;
+                originalCopyCanvas.width = image.width;
+                originalCopyCanvas.height = image.height;
+
+                var canvas = document.createElement("canvas");
+                var ctx = canvas.getContext("2d");
+                canvas.width = image.width;
+                canvas.height = image.height;
+                ctx.drawImage(image, 0, 0);
+                var pixelData = ctx.getImageData(
+                  0,
+                  0,
+                  canvas.width,
+                  canvas.height
+                ).data;
+                var redHistogramData = calculateHistogram(pixelData, 0);
+                var greenHistogramData = calculateHistogram(pixelData, 1);
+                var blueHistogramData = calculateHistogram(pixelData, 2);
+                // console.log("Red Histogram:", redHistogramData);
+                // console.log("Green Histogram:", greenHistogramData);
+                // console.log("Blue Histogram:", blueHistogramData);
+
+                // Проверка на равенство данных гистограмм
+                if (
+                  arraysAreEqual(redHistogramData, greenHistogramData) ||
+                  arraysAreEqual(redHistogramData, blueHistogramData) ||
+                  arraysAreEqual(greenHistogramData, blueHistogramData)
+                ) {
+                  console.error(
+                    "Ошибка: Данные гистограммы одинаковые после вычисления."
+                  );
+                }
+                updateChartData(redHistogramData, "red", cpchartCtx);
+                updateChartData(greenHistogramData, "green", cpgChartCtx);
+                updateChartData(blueHistogramData, "blue", cpbChartCtx);
+
+                updateChartData(redHistogramData, "red", chartCtx);
+                updateChartData(greenHistogramData, "green", gChartCtx);
+                updateChartData(blueHistogramData, "blue", bChartCtx);
+                photoCtx.drawImage(image, 0, 0);
+                // Делаем копию оригинального фото на втором холсте
+                originalCopyCtx.drawImage(image, 0, 0); // Рисуем оригинальное фото на втором холсте
+              };
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+
+      // Функция для проверки равенства массивов
+      function arraysAreEqual(array1, array2) {
+        if (array1.length !== array2.length) {
+          return false;
+        }
+        for (let i = 0; i < array1.length; i++) {
+          if (array1[i] !== array2[i]) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function calculateHistogram(pixelData, channel) {
+        const histogram = new Array(256).fill(0);
+        for (let i = channel; i < pixelData.length; i += 4) {
+          const value = pixelData[i];
+          histogram[value]++;
+        }
+        return histogram;
+      }
+
+      // Функция расчета кумулятивной гистограммы
+      function calculateCumulativeHistogram(histogram) {
+        // Создаем пустой массив, где будем хранить кумулятивную гистограмму
+        var cumulativeHistogram = [];
+        // Инициализируем переменную для подсчета суммы
+        var sum = 0;
+        // Проходимся по каждому элементу в исходной гистограмме
+        for (var i = 0; i < histogram.length; i++) {
+          // Увеличиваем сумму на значение текущего элемента гистограммы
+          sum += histogram[i];
+          // Добавляем текущее значение суммы в массив кумулятивной гистограммы
+          cumulativeHistogram.push(sum); // Присваиваем сумму, а не нормализованное значение
+        }
+        // Возвращаем массив кумулятивной гистограммы
+        return cumulativeHistogram;
+      }
+
+      // Переменная для хранения предыдущих данных гистограммы
+      var previousHistogramData = null;
+
+      // Функция применения гистограммы к изображению
+      function applyHistogramToPhoto(histogramData) {
+        // Проверяем, есть ли у нас предыдущие данные гистограммы
+        if (previousHistogramData !== null) {
+          // Инициализируем переменную для отслеживания равенства гистограмм
+          var equal = true;
+          // Проходимся по каждому элементу текущей гистограммы
+          for (var i = 0; i < histogramData.length; i++) {
+            // Проверяем, равны ли элементы текущей и предыдущей гистограмм
+            if (previousHistogramData[i] !== histogramData[i]) {
+              // Если хоть один элемент отличается, устанавливаем флаг в false и выходим из цикла
+              equal = false;
+              break;
+            }
+          }
+          // Если гистограммы равны, выводим сообщение об ошибке
+          if (equal) {
+            console.error("Предыдущие данные гистограммы равны текущим данным");
+          }
+        }
+        // Обновляем предыдущие данные гистограммы
+        previousHistogramData = histogramData.slice();
+        // Получаем данные пикселей изображения
+        var imageData = photoCtx.getImageData(
+          0,
+          0,
+          photoCanvas.width,
+          photoCanvas.height
+        );
+        var pixels = imageData.data;
+        // Вычисляем общее количество пикселей
+        var numPixels = pixels.length / 4;
+        // Рассчитываем кумулятивную гистограмму для текущих данных
+        var cumulativeHistogram = calculateCumulativeHistogram(histogramData);
+        // Проходимся по каждому пикселю изображения
+        for (var i = 0; i < pixels.length; i += 4) {
+          // Получаем значения красной, зеленой и синей компонент цвета
+          var red = pixels[i];
+          var green = pixels[i + 1]; // Получаем зеленую компоненту цвета
+          var blue = pixels[i + 2];
+          // Применяем кумулятивную гистограмму к компонентам цвета
+          pixels[i] = (cumulativeHistogram[red] / numPixels) * 255;
+          pixels[i + 1] = (cumulativeHistogram[green] / numPixels) * 255; // Применяем гистограмму к зеленой компоненте
+          pixels[i + 2] = (cumulativeHistogram[blue] / numPixels) * 255;
+        }
+        // Обновляем данные изображения
+        photoCtx.putImageData(imageData, 0, 0);
+        // Вычисляем обновленные данные гистограммы после применения
+        var updatedHistogramData = calculateHistogram(
+          photoCtx.getImageData(0, 0, photoCanvas.width, photoCanvas.height)
+            .data
+        );
+        // // Выводим в консоль обновленные данные гистограммы
+        // console.log(
+        //   "Данные гистограммы после применения:",
+        //   updatedHistogramData
+        // );
+      }
+    </script>
+  </body>
+</html>

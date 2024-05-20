@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Voxel Water with Physics</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Light setup
+        const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        // Voxel Water Grid
+        const gridWidth = 16;
+        const gridHeight = 8;
+        const gridDepth = 16;
+        const voxelSize = 1;
+
+        const waterMaterial = new THREE.MeshPhongMaterial({ color: 0x1E90FF, opacity: 0.7, transparent: true });
+        const terrainMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513, transparent: true, opacity: 0 });
+
+        function createVoxel(material, x, y, z) {
+            const geometry = new THREE.BoxGeometry(voxelSize, voxelSize, voxelSize);
+            const voxel = new THREE.Mesh(geometry, material);
+            voxel.position.set(x * voxelSize, y * voxelSize, z * voxelSize);
+            return voxel;
+        }
+
+        // Initialize water grid and room structure
+        const waterGrid = Array.from({ length: gridWidth }, () =>
+            Array.from({ length: gridHeight }, () => Array(gridDepth).fill(null))
+        );
+
+        const terrainGrid = Array.from({ length: gridWidth }, () =>
+            Array.from({ length: gridHeight }, () => Array(gridDepth).fill(null))
+        );
+
+        function addWaterVoxel(x, y, z) {
+            if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight || z < 0 || z >= gridDepth) return false;
+            if (waterGrid[x][y][z] !== null || terrainGrid[x][y][z] !== null) return false;
+
+            const voxel = createVoxel(waterMaterial, x, y, z);
+            waterGrid[x][y][z] = voxel;
+            scene.add(voxel);
+            return true;
+        }
+
+        function removeWaterVoxel(x, y, z) {
+            if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight || z < 0 || z >= gridDepth) return;
+
+            const voxel = waterGrid[x][y][z];
+            if (voxel === null) return;
+
+            scene.remove(voxel);
+            waterGrid[x][y][z] = null;
+        }
+
+        function addTerrainVoxel(x, y, z) {
+            if (x < 0 || x >= gridWidth || y < 0 || y >= gridHeight || z < 0 || z >= gridDepth) return;
+
+            const voxel = createVoxel(terrainMaterial, x, y, z);
+            terrainGrid[x][y][z] = voxel;
+            scene.add(voxel);
+        }
+
+        function generateRoom() {
+            // Create invisible walls
+            for (let x = 0; x < gridWidth; x++) {
+                for (let y = 0; y < gridHeight; y++) {
+                    addTerrainVoxel(x, y, 0);
+                    addTerrainVoxel(x, y, gridDepth - 1);
+                }
+            }
+
+            for (let z = 0; z < gridDepth; z++) {
+                for (let y = 0; y < gridHeight; y++) {
+                    addTerrainVoxel(0, y, z);
+                    addTerrainVoxel(gridWidth - 1, y, z);
+                }
+            }
+
+            // Create floor
+            for (let x = 0; x < gridWidth; x++) {
+                for (let z = 0; z < gridDepth; z++) {
+                    addTerrainVoxel(x, 0, z);
+                }
+            }
+
+            // Create ceiling
+            for (let x = 0; x < gridWidth; x++) {
+                for (let z = 0; z < gridDepth; z++) {
+                    addTerrainVoxel(x, gridHeight - 1, z);
+                }
+            }
+        }
+
+        function flowWater() {
+            const directions = [
+                [0, -1, 0], // down
+                [1, 0, 0], // right
+                [-1, 0, 0], // left
+                [0, 0, 1], // forward
+                [0, 0, -1] // backward
+            ];
+
+            const newWaterGrid = waterGrid.map(row => row.map(cell => [...cell]));
+
+            for (let x = 0; x < gridWidth; x++) {
+                for (let y = gridHeight - 1; y >= 0; y--) {
+                    for (let z = 0; z < gridDepth; z++) {
+                        if (waterGrid[x][y][z] === null) continue;
+
+                        let flowed = false;
+
+                        // Try to flow down first
+                        const down = [x, y - 1, z];
+                        if (down[1] >= 0 && newWaterGrid[down[0]][down[1]][down[2]] === null && terrainGrid[down[0]][down[1]][down[2]] === null) {
+                            newWaterGrid[down[0]][down[1]][down[2]] = waterGrid[x][y][z];
+                            newWaterGrid[x][y][z] = null;
+                            flowed = true;
+                        }
+
+                        // If not flowed down, try to spread horizontally
+                        if (!flowed) {
+                            for (const [dx, dy, dz] of directions.slice(1)) {
+                                const nx = x + dx;
+                                const ny = y + dy;
+                                const nz = z + dz;
+
+                                if (
+                                    nx >= 0 &&
+                                    nx < gridWidth &&
+                                    ny >= 0 &&
+                                    ny < gridHeight &&
+                                    nz >= 0 &&
+                                    nz < gridDepth &&
+                                    newWaterGrid[nx][ny][nz] === null &&
+                                    terrainGrid[nx][ny][nz] === null
+                                ) {
+                                    newWaterGrid[nx][ny][nz] = waterGrid[x][y][z];
+                                    newWaterGrid[x][y][z] = null;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update water grid
+            for (let x = 0; x < gridWidth; x++) {
+                for (let y = 0; y < gridHeight; y++) {
+                    for (let z = 0; z < gridDepth; z++) {
+                        if (newWaterGrid[x][y][z] !== waterGrid[x][y][z]) {
+                            if (newWaterGrid[x][y][z] !== null && waterGrid[x][y][z] === null) {
+                                addWaterVoxel(x, y, z);
+                            } else if (newWaterGrid[x][y][z] === null && waterGrid[x][y][z] !== null) {
+                                removeWaterVoxel(x, y, z);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add initial water source
+        function addWaterSource(x, y, z) {
+            setInterval(() => addWaterVoxel(x, y, z), 500);
+        }
+
+        generateRoom();
+        addWaterSource(Math.floor(gridWidth / 2), gridHeight - 1, Math.floor(gridDepth / 2));
+
+        // Camera position
+        camera.position.set(gridWidth * 1.5, gridHeight * 1.5, gridDepth * 1.5);
+        camera.lookAt(new THREE.Vector3(gridWidth / 2, gridHeight / 2, gridDepth / 2));
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            flowWater();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Handle resize
+        window.addEventListener('resize', function () {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

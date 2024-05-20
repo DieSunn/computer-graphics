@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Пирамида</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas1" width="1000" height="700"></canvas>
+    <input type="file" id="textureInput" accept="image/*" />
+    <form id="cubeForm">
+      <script>
+        // Функция для загрузки изображения текстуры и применения ее к пирамиде
+        function applyTextureFromInput() {
+          const input = document.getElementById("textureInput");
+          const file = input.files[0];
+
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+              const textureDataUrl = event.target.result; // Получаем Data URL изображения
+              createPyramid(textureDataUrl); // Передаем Data URL в функцию createPyramid
+            };
+
+            reader.readAsDataURL(file); // Читаем файл как Data URL
+          }
+        }
+      </script>
+      <label>
+        Количество ребер основания:
+        <input type="number" id="cubeSizeInput" min="1" value="3" />
+      </label>
+      <button type="button" onclick="applyTextureFromInput()">Создать</button>
+    </form>
+    <form id="checkboxForm">
+      <label>
+        <input type="checkbox" name="checkboxX" /> Поворот по оси X
+      </label>
+      <br />
+      <label>
+        <input type="checkbox" name="checkboxY" /> Поворот по оси Y
+      </label>
+      <br />
+      <label>
+        <input type="checkbox" name="checkboxZ" /> Поворот по оси Z
+      </label>
+    </form>
+
+    <script src="script_pyramisd_copy.js"></script>
+  </body>
+</html>

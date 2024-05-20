@@ -1,0 +1,11 @@
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\bin\Debug\LayOn.exe.config
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\bin\Debug\LayOn.exe
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\bin\Debug\LayOn.pdb
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.csproj.AssemblyReference.cache
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.csproj.SuggestedBindingRedirects.cache
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.Form1.resources
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.Properties.Resources.resources
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.csproj.GenerateResource.cache
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.csproj.CoreCompileInputs.cache
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.exe
+F:\прога\Универ\графика\computer-graphics\lab_overlay\LayOn\LayOn\obj\Debug\LayOn.pdb
